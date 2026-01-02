@@ -1,0 +1,99 @@
+Template id- 2375887
+
+Request:
+
+curl --location 'https://partnersv1.pinbot.ai/v3/922652130930499/messages' \
+--header 'apikey: 6bfd35b7-d02c-11f0-ae2b-02c8a5e042bd' \
+--header 'Content-Type: application/json' \
+--data '{
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": "917385553387",
+    "type": "template",
+    "template": {
+        "name": "nudge2",
+        "language": {
+            "code": "en"
+        },
+        "components": [
+            {
+                "type": "body",
+                "parameters": [
+                    
+                    
+                
+                    
+                    
+                ]
+            }
+        ]
+    }
+}'
+
+
+Response:
+
+{
+    "messaging_product": "whatsapp",
+    "contacts": [
+        {
+            "input": "917385553387",
+            "wa_id": "917385553387"
+        }
+    ],
+    "messages": [
+        {
+            "id": "wamid.HBgMOTE3Mzg1NTUzMzg3FQIAERgSMTRCMkY4MjczNDNCMjE0NjQ4AA==",
+            "message_status": "accepted"
+        }
+    ]
+}
+
+
+Template Id-2375881
+
+Request:
+
+
+curl --location 'https://partnersv1.pinbot.ai/v3/922652130930499/messages' \
+--header 'apikey: 6bfd35b7-d02c-11f0-ae2b-02c8a5e042bd' \
+--header 'Content-Type: application/json' \
+--data '{
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": "917385553387",
+    "type": "template",
+    "template": {
+        "name": "nudg1",
+        "language": {
+            "code": "en"
+        },
+        "components": [
+            {
+                "type": "body",
+                "parameters": [
+                    
+                    
+                ]
+            }
+        ]
+    }
+}'
+
+Response:
+
+{
+    "messaging_product": "whatsapp",
+    "contacts": [
+        {
+            "input": "917385553387",
+            "wa_id": "917385553387"
+        }
+    ],
+    "messages": [
+        {
+            "id": "wamid.HBgMOTE3Mzg1NTUzMzg3FQIAERgSMERDMkE3RkQzQUMxNTQ2MzZEAA==",
+            "message_status": "accepted"
+        }
+    ]
+}
