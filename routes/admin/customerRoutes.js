@@ -1,6 +1,7 @@
 // routes/admin/customerRoutes.js
 const express = require("express");
-const { authenticate, requireAdmin } = require("../../middleware/authenticate");
+const { authenticate} = require("../../middleware/authenticate");
+const checkPermission = require("../../middleware/checkPermission");
 const {
   getAllCustomers,
   getCustomerStats,
@@ -12,11 +13,11 @@ const router = express.Router();
 
 // All routes require admin authentication
 router.use(authenticate);
-router.use(requireAdmin);
+// router.use(requireAdmin);
 
-router.get("/", getAllCustomers);
-router.get("/stats", getCustomerStats);
-router.get("/monthly-data", getMonthlyCustomerData);
-router.delete("/:customerId", deleteCustomer);
+router.get("/", checkPermission("customers"), getAllCustomers);
+router.get("/stats", checkPermission("customers"), getCustomerStats);
+router.get("/monthly-data", checkPermission("customers"), getMonthlyCustomerData);
+router.delete("/:customerId", checkPermission("customers"), deleteCustomer);
 
 module.exports = router;

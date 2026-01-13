@@ -735,40 +735,57 @@ const getDashboardStats = async (req, res) => {
 };
 
 /**
- * Get monthly sales data for chart (last 12 months)
+ * Get monthly sales data for selected financial year
  */
 const getMonthlySalesData = async (req, res) => {
   try {
     const pool = await getPool();
+    const { fy } = req.query;
 
-    const result = await pool.query(`
-      SELECT 
-        FORMAT(order_date, 'MMM') as month,
-        MONTH(order_date) as month_num,
-        YEAR(order_date) as year,
-        ISNULL(SUM(total_amount), 0) as total_sales
-      FROM orders
-      WHERE order_date >= DATEADD(MONTH, -12, GETDATE())
-        AND status != 'Cancelled'
-      GROUP BY FORMAT(order_date, 'MMM'), MONTH(order_date), YEAR(order_date)
-      ORDER BY YEAR(order_date), MONTH(order_date)
-    `);
+    let startDate, endDate;
 
-    res.json({
-      success: true,
-      data: result.recordset,
-    });
+    if (fy) {
+      const [startYear, endYearShort] = fy.split("-");
+      const endYear = Number(`20${endYearShort}`);
+
+      startDate = new Date(`${startYear}-04-01`);
+      endDate = new Date(`${endYear}-04-01`);
+    } else {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const fyStartYear = month >= 3 ? year : year - 1;
+
+      startDate = new Date(`${fyStartYear}-04-01`);
+      endDate = new Date(`${fyStartYear + 1}-04-01`);
+    }
+
+    const result = await pool
+      .request()
+      .input("startDate", startDate) // ✅ Date object
+      .input("endDate", endDate)     // ✅ Date object
+      .query(`
+        SELECT 
+          MONTH(order_date) AS month_num,
+          YEAR(order_date) AS year,
+          SUM(total_amount) AS total_sales
+        FROM orders
+        WHERE order_date >= @startDate
+          AND order_date < @endDate
+          AND status != 'Cancelled'
+        GROUP BY MONTH(order_date), YEAR(order_date)
+        ORDER BY YEAR(order_date), MONTH(order_date)
+      `);
+
+    res.json({ success: true, data: result.recordset });
   } catch (err) {
-    logger.error("Get monthly sales data error", {
-      message: err.message,
-      stack: err.stack,
-    });
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch monthly sales data",
-    });
+    logger.error("Get monthly sales data error", err);
+    res.status(500).json({ success: false });
   }
 };
+
+
+
 
 module.exports = {
   getAllOrders,

@@ -12,6 +12,8 @@ const {
   getGlobalIcons,
   updateGlobalIcons
 } = require("../../controllers/admin/teaController");
+const { authenticate } = require("../../middleware/authenticate");
+const checkPermission = require("../../middleware/checkPermission");
 
 const router = express.Router();
 
@@ -29,20 +31,22 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+router.use(authenticate);
+
 // GET global icons (tea_id IS NULL)
-router.get("/global-icons", getGlobalIcons);
+router.get("/global-icons", checkPermission("tea-management"), getGlobalIcons);
 
 // PUT update global icons (admin only)
-router.put("/global-icons", upload.fields([{ name: "icons" }]), updateGlobalIcons);
+router.put("/global-icons", upload.fields([{ name: "icons" }]), checkPermission("tea-management"), updateGlobalIcons);
 
 // GET all teas
-router.get("/", getAllTeas);
+router.get("/", checkPermission("tea-management"), getAllTeas);
 
 // GET single tea by slug
-router.get("/slug/:slug", getTeaById);
+router.get("/slug/:slug", checkPermission("tea-management"), getTeaById);
 
 // GET single tea by id
-router.get("/:id", getTeaById);
+router.get("/:id", checkPermission("tea-management"), getTeaById);
 
 // POST create new tea
 router.post(
@@ -51,7 +55,7 @@ router.post(
     { name: "teaImages" },
     { name: "brewingIcons" },
   ]),
-  createTea
+  checkPermission("tea-management"), createTea
 );
 
 // PUT update tea
@@ -61,13 +65,13 @@ router.put(
     { name: "teaImages" },
     { name: "brewingIcons" },
   ]),
-  updateTea
+  checkPermission("tea-management"), updateTea
 );
 
 // DELETE tea
-router.delete("/:id", deleteTea);
+router.delete("/:id", checkPermission("tea-management"), deleteTea);
 
 // PATCH toggle tea status
-router.patch("/:id/toggle", toggleTeaStatus);
+router.patch("/:id/toggle", checkPermission("tea-management"), toggleTeaStatus);
 
 module.exports = router;

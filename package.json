@@ -36,6 +36,9 @@
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.10",
+    "pdfkit": "^0.17.2",
+    "puppeteer": "^24.34.0",
+    "socket.io": "^4.8.3",
     "validator": "^13.15.20",
     "winston": "^3.18.3",
     "xss-clean": "^0.1.4"

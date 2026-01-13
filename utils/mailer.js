@@ -27,13 +27,14 @@ transporter.verify((error) => {
 /**
  * Send email (non-blocking, returns immediately)
  */
-async function sendEmail({ to, subject, html }) {
+async function sendEmail({ to, subject, html, attachments = [] }) {
   return transporter
     .sendMail({
       from: `"Zenveda" <${process.env.SMTP_USER}>`,
       to,
       subject,
       html,
+      attachments,
     })
     .then((info) => {
       console.log("✅ Email sent:", info.messageId);

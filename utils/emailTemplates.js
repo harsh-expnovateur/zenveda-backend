@@ -375,10 +375,100 @@ function orderCancelledTemplate(order) {
   `;
 }
 
+function newUserPasswordTemplate({ name, email, password, role }) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          background: #f4f6f8;
+          padding: 20px;
+        }
+        .container {
+          max-width: 600px;
+          background: #ffffff;
+          margin: 0 auto;
+          padding: 30px;
+          border-radius: 10px;
+        }
+        .header {
+          background: linear-gradient(135deg, #10b981, #22c55e);
+          color: white;
+          padding: 20px;
+          border-radius: 8px 8px 0 0;
+          text-align: center;
+        }
+        .content {
+          padding: 20px;
+        }
+        .box {
+          background: #f9fafb;
+          padding: 15px;
+          border-radius: 6px;
+          margin: 20px 0;
+        }
+        .label {
+          font-weight: bold;
+        }
+        .footer {
+          margin-top: 30px;
+          font-size: 12px;
+          color: #666;
+          text-align: center;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h2>Welcome to Zenveda Admin Panel</h2>
+        </div>
+
+        <div class="content">
+          <p>Hi <strong>${name}</strong>,</p>
+
+          <p>
+            Your admin account has been created successfully.
+            Below are your login credentials:
+          </p>
+
+          <div class="box">
+            <p><span class="label">Email:</span> ${email}</p>
+            <p><span class="label">Temporary Password:</span> ${password}</p>
+            <p><span class="label">Role:</span> ${role}</p>
+          </div>
+
+          <p>
+            For security reasons, please log in and change your password immediately.
+          </p>
+
+          <p>
+            <a href="${process.env.ADMIN_URL || "http://localhost:5173"}"
+               style="display:inline-block;margin-top:15px;
+               background:#10b981;color:#fff;padding:10px 20px;
+               border-radius:6px;text-decoration:none;">
+              Login to Admin Panel
+            </a>
+          </p>
+        </div>
+
+        <div class="footer">
+          © ${new Date().getFullYear()} Zenveda. All rights reserved.
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+
 module.exports = {
   customerTemplate,
   adminTemplate,
   orderShippedTemplate,
   orderDeliveredTemplate,
   orderCancelledTemplate,
+  newUserPasswordTemplate
 };

@@ -12,21 +12,37 @@ const {
   getDashboardStats,
   getMonthlySalesData,
 } = require("../../controllers/admin/orderController");
+const checkPermission = require("../../middleware/checkPermission");
+
 
 const router = express.Router();
 
 // All routes require admin authentication
 router.use(authenticate);
-router.use(requireAdmin);
 
-router.get("/", getAllOrders);
-router.put("/:orderId/status", updateOrderStatus);
-router.put("/:orderId/payment", updatePaymentStatus);
-router.post("/:orderId/shipment", createShipment);
-router.post("/:orderId/shipment/cancel", cancelShipment);
-router.get("/:orderId/tracking", getShipmentTracking);
-router.post("/:orderId/shipment/label", generateShipmentLabel);
-router.get("/dashboard/stats", getDashboardStats);
-router.get("/dashboard/monthly-sales", getMonthlySalesData);
+// Dashboard
+router.get(
+  "/dashboard/stats",
+  checkPermission("dashboard-stats"),
+  getDashboardStats
+);
+
+router.get(
+  "/dashboard/monthly-sales",
+  checkPermission("dashboard-stats"),
+  getMonthlySalesData
+);
+
+// Orders
+router.get("/", checkPermission("orders"), getAllOrders);
+router.put("/:orderId/status", checkPermission("orders"), updateOrderStatus);
+router.put("/:orderId/payment", checkPermission("orders"), updatePaymentStatus);
+
+// Shipments
+router.post("/:orderId/shipment", checkPermission("orders"), createShipment);
+router.post("/:orderId/shipment/cancel", checkPermission("orders"), cancelShipment);
+router.get("/:orderId/tracking", checkPermission("orders"), getShipmentTracking);
+router.post("/:orderId/shipment/label", checkPermission("orders"), generateShipmentLabel);
+
 
 module.exports = router;

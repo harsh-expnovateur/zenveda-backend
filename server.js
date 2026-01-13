@@ -19,10 +19,12 @@ const adminOrderRoutes = require("./routes/admin/orderRoutes");
 // Add with other admin routes imports
 const adminCustomerRoutes = require("./routes/admin/customerRoutes");
 const adminDiscountRoutes = require("./routes/admin/discountRoutes");
+const adminUserRoutes = require("./routes/admin/userRoutes");
 
 
 // Customer routes
 const customerAuthRoutes = require("./routes/customer/authRoutes");
+const customerTeaRoutes = require("./routes/customer/teaRoutes");
 
 // Add this import with other admin routes
 const ingredientRoutes = require("./routes/admin/ingredientRoutes");
@@ -85,6 +87,7 @@ app.use('/api/admin/discounts', adminDiscountRoutes);
 
 // Customer Routes
 app.use("/api/customer/auth", customerAuthRoutes);
+app.use("/api/teas", customerTeaRoutes)
 
 // Add this route with other admin routes
 app.use("/api/ingredients", ingredientRoutes);
@@ -97,6 +100,8 @@ app.use("/api/discounts", customerDiscountRoutes);
 // Address routes
 app.use("/api/customer/address", addressRoutes);
 
+app.use("/api/admin/users", adminUserRoutes);
+
 // Generic error handler
 app.use((err, req, res, next) => {
   logger.error("Unhandled error: %o", err);
@@ -104,6 +109,10 @@ app.use((err, req, res, next) => {
 });
 
 require("./cron/whatsappNudges");
+
+// Public folder (for any public assets)
+app.use("/public", express.static("public"));
+
 
 
 // Create default admin user if not exists
@@ -139,7 +148,7 @@ async function createDefaultAdmin() {
 (async () => {
   await createDefaultAdmin();  // <-- Auto-create admin on startup
 
-  app.listen(port, "0.0.0.0", () => {
+  app.listen(port,() => {
     logger.info(`Server running on port ${port}`);
     console.log(`Server running on port ${port}`);
   });

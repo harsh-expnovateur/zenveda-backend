@@ -4,6 +4,8 @@ const axios = require("axios");
    ENV VALIDATION (FAIL FAST 🔥)
 ----------------------------------- */
 
+const WHATSAPP_ENABLED = process.env.WHATSAPP_ENABLED === "true";
+
 const BASE_URL = process.env.PINBOT_WHATSAPP_BASE_URL;
 const SENDER_ID = process.env.PINBOT_WHATSAPP_SENDER_ID;
 const API_KEY = process.env.PINBOT_WHATSAPP_API_KEY;
@@ -49,6 +51,11 @@ const TEMPLATE_MAP = Object.freeze({
  * @param {string} event - REORDER | DISCOVER_BLEND
  */
 const sendTemplateMessage = async ({ phone, event }) => {
+  if (!WHATSAPP_ENABLED) {
+    logger.info("WhatsApp sending disabled by ENV flag");
+    return; // ✅ No API call, no charge
+  }
+
   if (!phone || !event) {
     throw new Error("phone and event are required");
   }

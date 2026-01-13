@@ -15,6 +15,7 @@ const {
   customerTemplate,
   adminTemplate,
 } = require("../../utils/emailTemplates");
+const { generateInvoicePDF } = require("../../utils/invoiceGenerator");
 const {
   getExpectedTAT,
   cancelDelhiveryShipment,
@@ -60,7 +61,6 @@ function normalizePhone(phone) {
 
   return null;
 }
-
 
 /**
  * Create order from cart
@@ -155,24 +155,92 @@ const placeOrder = async (req, res) => {
         orderStatus: "Delivered",
       });
 
+      // ✅ FIX: Response is already extracted in service, check for error first
       if (shippingCharges && !shippingCharges.error) {
+        logger.info("Raw shipping charges from API", {
+          orderId: order.order_id,
+          rawData: JSON.stringify(shippingCharges),
+        });
+
+        // ✅ Prepare data structure with proper field mapping
+        const chargeDataToSave = {
+          // All charge fields
+          charge_ROV: shippingCharges.charge_ROV || 0,
+          charge_REATTEMPT: shippingCharges.charge_REATTEMPT || 0,
+          charge_RTO: shippingCharges.charge_RTO || 0,
+          charge_MPS: shippingCharges.charge_MPS || 0,
+          charge_pickup: shippingCharges.charge_pickup || 0,
+          charge_CWH: shippingCharges.charge_CWH || 0,
+          charge_DEMUR: shippingCharges.charge_DEMUR || 0,
+          charge_AWB: shippingCharges.charge_AWB || 0,
+          charge_AIR: shippingCharges.charge_AIR || 0,
+          charge_FSC: shippingCharges.charge_FSC || 0,
+          charge_LABEL: shippingCharges.charge_LABEL || 0,
+          charge_COD: shippingCharges.charge_COD || 0,
+          charge_PEAK: shippingCharges.charge_PEAK || 0,
+          charge_POD: shippingCharges.charge_POD || 0,
+          charge_LM: shippingCharges.charge_LM || 0,
+          charge_CCOD: shippingCharges.charge_CCOD || 0,
+          charge_E2E: shippingCharges.charge_E2E || 0,
+          charge_DTO: shippingCharges.charge_DTO || 0,
+          charge_COVID: shippingCharges.charge_COVID || 0,
+          charge_DL: shippingCharges.charge_DL || 0,
+          charge_DPH: shippingCharges.charge_DPH || 0,
+          charge_FOD: shippingCharges.charge_FOD || 0,
+          charge_DOCUMENT: shippingCharges.charge_DOCUMENT || 0,
+          charge_WOD: shippingCharges.charge_WOD || 0,
+          charge_INS: shippingCharges.charge_INS || 0,
+          charge_FS: shippingCharges.charge_FS || 0,
+          charge_CNC: shippingCharges.charge_CNC || 0,
+          charge_FOV: shippingCharges.charge_FOV || 0,
+          charge_QC: shippingCharges.charge_QC || 0,
+
+          // Basic fields
+          zone: shippingCharges.zone || null,
+          status: shippingCharges.status || null,
+          charged_weight: shippingCharges.charged_weight || null,
+          gross_amount: shippingCharges.gross_amount || 0,
+          total_amount: shippingCharges.total_amount || 0,
+
+          // Tax data - handle nested object
+          tax_data: {
+            swacch_bharat_tax: shippingCharges.tax_data?.swacch_bharat_tax || 0,
+            IGST: shippingCharges.tax_data?.IGST || 0,
+            SGST: shippingCharges.tax_data?.SGST || 0,
+            service_tax: shippingCharges.tax_data?.service_tax || 0,
+            krishi_kalyan_cess:
+              shippingCharges.tax_data?.krishi_kalyan_cess || 0,
+            CGST: shippingCharges.tax_data?.CGST || 0,
+          },
+        };
+
+        // ✅ Save to database
         await saveShippingCharge({
           orderId: order.order_id,
           shipmentId: null,
-          api: shippingCharges,
+          api: chargeDataToSave,
         });
 
+        // ✅ Store for response
         savedShippingCharge = shippingCharges.total_amount || 0;
 
-        logger.info("Shipping charges saved", {
+        logger.info("Shipping charges saved successfully", {
           orderId: order.order_id,
           totalAmount: savedShippingCharge,
+          zone: shippingCharges.zone,
+          weight: shippingCharges.charged_weight,
+        });
+      } else {
+        logger.warn("Shipping charges calculation returned error", {
+          orderId: order.order_id,
+          error: shippingCharges?.message,
         });
       }
     } catch (err) {
-      logger.error("Shipping charge save failed", {
+      logger.error("Shipping charge calculation/save failed", {
         error: err.message,
         orderId: order.order_id,
+        stack: err.stack,
       });
     }
 
@@ -225,35 +293,125 @@ const placeOrder = async (req, res) => {
 
     await clearCart(customerId);
 
-    const orderDataForEmail = {
-      customerName: customerName,
-      orderNumber: order.order_number,
-      totalAmount: finalAmount.toFixed(2),
-      customerEmail: customerEmail || req.user.email,
+    // Prepare complete order data for PDF and emails
+    const completeOrderData = {
+      order_number: order.order_number,
+      order_id: order.order_id,
+      order_date: new Date(),
+      created_at: new Date(),
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      customer_email: customerEmail || req.user.email,
+      shipping_address: shippingAddress,
+      shipping_city: shippingCity,
+      shipping_state: shippingState,
+      shipping_pincode: shippingPincode,
+      total_amount: finalAmount,
+      subtotal_amount: subtotalAmount,
+      discount_amount: safeDiscountAmount,
+      shipping_charge: savedShippingCharge || 0,
+      tax_amount: 0,
+      payment_status: "Pending",
       items: orderItems,
-      shippingAddress: {
-        address: shippingAddress,
-        city: shippingCity,
-        state: shippingState,
-        pincode: shippingPincode,
-      },
     };
 
-    sendEmail({
-      to: orderDataForEmail.customerEmail,
-      subject: `Order Confirmation - ${orderDataForEmail.orderNumber}`,
-      html: customerTemplate(orderDataForEmail),
-    }).catch((err) => {
-      logger.error("Failed to send customer email", { error: err.message });
-    });
+    // Generate PDF and send emails (non-blocking)
+    generateInvoicePDF(completeOrderData)
+      .then(async (pdfBuffer) => {
+        // Prepare email data
+        const orderDataForEmail = {
+          customerName: customerName,
+          orderNumber: order.order_number,
+          totalAmount: finalAmount.toFixed(2),
+          customerEmail: customerEmail || req.user.email,
+          items: orderItems,
+          shippingAddress: {
+            address: shippingAddress,
+            city: shippingCity,
+            state: shippingState,
+            pincode: shippingPincode,
+          },
+        };
 
-    sendEmail({
-      to: process.env.ADMIN_EMAIL || "admin@yourstore.com",
-      subject: `New Order Received - ${orderDataForEmail.orderNumber}`,
-      html: adminTemplate(orderDataForEmail),
-    }).catch((err) => {
-      logger.error("Failed to send admin email", { error: err.message });
-    });
+        // Send customer email with PDF invoice
+        await sendEmail({
+          to: orderDataForEmail.customerEmail,
+          subject: `Order Confirmation - ${orderDataForEmail.orderNumber}`,
+          html: customerTemplate(orderDataForEmail),
+          attachments: [
+            {
+              filename: `Invoice-${order.order_number}.pdf`,
+              content: pdfBuffer,
+              contentType: "application/pdf",
+            },
+          ],
+        }).catch((err) => {
+          logger.error("Failed to send customer email", { error: err.message });
+        });
+
+        // Send admin email with PDF invoice
+        await sendEmail({
+          to: process.env.ADMIN_EMAIL || "admin@yourstore.com",
+          subject: `New Order Received - ${orderDataForEmail.orderNumber}`,
+          html: adminTemplate(orderDataForEmail),
+          attachments: [
+            {
+              filename: `Invoice-${order.order_number}.pdf`,
+              content: pdfBuffer,
+              contentType: "application/pdf",
+            },
+          ],
+        }).catch((err) => {
+          logger.error("Failed to send admin email", { error: err.message });
+        });
+
+        logger.info("Invoice PDF generated and emails sent", {
+          orderId: order.order_id,
+          orderNumber: order.order_number,
+        });
+      })
+      .catch((err) => {
+        logger.error("Failed to generate invoice PDF", {
+          error: err.message,
+          orderId: order.order_id,
+          stack: err.stack,
+        });
+
+        // Fallback: Send emails without PDF
+        const orderDataForEmail = {
+          customerName: customerName,
+          orderNumber: order.order_number,
+          totalAmount: finalAmount.toFixed(2),
+          customerEmail: customerEmail || req.user.email,
+          items: orderItems,
+          shippingAddress: {
+            address: shippingAddress,
+            city: shippingCity,
+            state: shippingState,
+            pincode: shippingPincode,
+          },
+        };
+
+        sendEmail({
+          to: orderDataForEmail.customerEmail,
+          subject: `Order Confirmation - ${orderDataForEmail.orderNumber}`,
+          html: customerTemplate(orderDataForEmail),
+        }).catch((err) => {
+          logger.error("Failed to send customer email (fallback)", {
+            error: err.message,
+          });
+        });
+
+        sendEmail({
+          to: process.env.ADMIN_EMAIL || "admin@yourstore.com",
+          subject: `New Order Received - ${orderDataForEmail.orderNumber}`,
+          html: adminTemplate(orderDataForEmail),
+        }).catch((err) => {
+          logger.error("Failed to send admin email (fallback)", {
+            error: err.message,
+          });
+        });
+      });
 
     // --------------------
     // WhatsApp: PAYMENT_PENDING (non-blocking)

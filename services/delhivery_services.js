@@ -232,7 +232,7 @@ const trackShipment = async (waybill, orderId) => {
  */
 const calculateShippingCharges = async ({
   mode = "E",
-  orderStatus = "Delivered",
+  orderStatus,
   destinationPin,
   weightGrams = 500,
   paymentType = "Pre-paid",
@@ -240,7 +240,7 @@ const calculateShippingCharges = async ({
   const originPin = process.env.ORIGIN_PINCODE || "122004";
 
   try {
-    const res = await delhiveryClient.get("/kinko/v1/invoice/charges/.json", {
+    const res = await delhiveryClient.get("api/kinko/v1/invoice/charges/.json", {
       params: {
         md: mode,
         ss: orderStatus,

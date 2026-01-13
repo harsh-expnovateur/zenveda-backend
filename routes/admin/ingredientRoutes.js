@@ -9,6 +9,8 @@ const {
   updateIngredientHandler,
   deleteIngredientHandler,
 } = require("../../controllers/admin/ingredientController");
+const { authenticate } = require("../../middleware/authenticate");
+const checkPermission = require("../../middleware/checkPermission");
 
 const router = express.Router();
 
@@ -22,19 +24,21 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+router.use(authenticate);
+
 // GET all ingredients
-router.get("/", getIngredients);
+router.get("/", checkPermission("manage-ingredients"), getIngredients);
 
 // GET single ingredient
-router.get("/:id", getIngredient);
+router.get("/:id", checkPermission("manage-ingredients"), getIngredient);
 
 // POST create ingredient
-router.post("/", upload.single("image"), createIngredientHandler);
+router.post("/", upload.single("image"), checkPermission("manage-ingredients"), createIngredientHandler);
 
 // PUT update ingredient
-router.put("/:id", upload.single("image"), updateIngredientHandler);
+router.put("/:id", upload.single("image"), checkPermission("manage-ingredients"), updateIngredientHandler);
 
 // DELETE ingredient
-router.delete("/:id", deleteIngredientHandler);
+router.delete("/:id", checkPermission("manage-ingredients"), deleteIngredientHandler);
 
 module.exports = router;
