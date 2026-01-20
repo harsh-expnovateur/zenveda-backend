@@ -102,6 +102,16 @@ app.use("/api/customer/address", addressRoutes);
 
 app.use("/api/admin/users", adminUserRoutes);
 
+// ===== VITE FRONTEND SERVE =====
+// const frontendPath = path.join(__dirname, "dist");
+
+// app.use(express.static(frontendPath));
+
+// app.get("*", (req, res) => {
+//   res.sendFile(path.join(frontendPath, "index.html"));
+// });
+
+
 // Generic error handler
 app.use((err, req, res, next) => {
   logger.error("Unhandled error: %o", err);

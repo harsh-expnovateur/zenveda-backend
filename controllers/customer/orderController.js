@@ -39,7 +39,6 @@ function calculateExpectedDeliveryDate(tatDays, pickupDate = new Date()) {
  * Calculate total weight from cart items
  */
 function calculateCartWeight(cartItems) {
-  // Default weight per item if not available (in grams)
   const DEFAULT_WEIGHT = 100;
 
   return cartItems.reduce((total, item) => {
@@ -104,11 +103,10 @@ const placeOrder = async (req, res) => {
 
     const subtotalAmount = cartItems.reduce(
       (sum, item) => sum + parseFloat(item.selling_price) * item.quantity,
-      0
+      0,
     );
 
     const safeDiscountAmount = Math.min(discountAmount, subtotalAmount);
-
     const finalAmount = subtotalAmount - safeDiscountAmount;
 
     const order = await createOrder({
@@ -122,7 +120,6 @@ const placeOrder = async (req, res) => {
       customerName,
       customerPhone,
       customerEmail: customerEmail || req.user.email,
-
       safeDiscountAmount: safeDiscountAmount,
       discountId: appliedDiscountId ?? null,
     });
@@ -155,16 +152,13 @@ const placeOrder = async (req, res) => {
         orderStatus: "Delivered",
       });
 
-      // ✅ FIX: Response is already extracted in service, check for error first
       if (shippingCharges && !shippingCharges.error) {
         logger.info("Raw shipping charges from API", {
           orderId: order.order_id,
           rawData: JSON.stringify(shippingCharges),
         });
 
-        // ✅ Prepare data structure with proper field mapping
         const chargeDataToSave = {
-          // All charge fields
           charge_ROV: shippingCharges.charge_ROV || 0,
           charge_REATTEMPT: shippingCharges.charge_REATTEMPT || 0,
           charge_RTO: shippingCharges.charge_RTO || 0,
@@ -194,15 +188,11 @@ const placeOrder = async (req, res) => {
           charge_CNC: shippingCharges.charge_CNC || 0,
           charge_FOV: shippingCharges.charge_FOV || 0,
           charge_QC: shippingCharges.charge_QC || 0,
-
-          // Basic fields
           zone: shippingCharges.zone || null,
           status: shippingCharges.status || null,
           charged_weight: shippingCharges.charged_weight || null,
           gross_amount: shippingCharges.gross_amount || 0,
           total_amount: shippingCharges.total_amount || 0,
-
-          // Tax data - handle nested object
           tax_data: {
             swacch_bharat_tax: shippingCharges.tax_data?.swacch_bharat_tax || 0,
             IGST: shippingCharges.tax_data?.IGST || 0,
@@ -214,14 +204,12 @@ const placeOrder = async (req, res) => {
           },
         };
 
-        // ✅ Save to database
         await saveShippingCharge({
           orderId: order.order_id,
           shipmentId: null,
           api: chargeDataToSave,
         });
 
-        // ✅ Store for response
         savedShippingCharge = shippingCharges.total_amount || 0;
 
         logger.info("Shipping charges saved successfully", {
@@ -244,7 +232,7 @@ const placeOrder = async (req, res) => {
       });
     }
 
-    // Fetch TAT from Delhivery API (non-blocking)
+    // ✅ FIX: Fetch TAT synchronously and handle response properly
     const today = new Date();
     const expectedPickupDate = new Date(today);
     expectedPickupDate.setDate(today.getDate() + 1);
@@ -252,44 +240,100 @@ const placeOrder = async (req, res) => {
     const yyyy = expectedPickupDate.getFullYear();
     const mm = String(expectedPickupDate.getMonth() + 1).padStart(2, "0");
     const dd = String(expectedPickupDate.getDate()).padStart(2, "0");
-    const pickupDateStr = `${yyyy}-${mm}-${dd} 00:00`;
+    const pickupDateStr = `${yyyy}-${mm}-${dd}`;
 
-    getExpectedTAT(shippingPincode, originPin, "S", "B2C", pickupDateStr)
-      .then((tatResponse) => {
-        if (tatResponse.success && tatResponse.data && tatResponse.data.tat) {
-          const tatDays = tatResponse.data.tat;
-          const expectedDeliveryDate = calculateExpectedDeliveryDate(
-            tatDays,
-            expectedPickupDate
-          );
+    try {
+      const tatResponse = await getExpectedTAT(
+        shippingPincode,
+        originPin,
+        "S",
+        "B2C",
+        pickupDateStr
+      );
 
-          saveTATQuery({
-            orderId: order.order_id,
-            originPin,
-            destinationPin: shippingPincode,
-            mot: "S",
-            pdt: "B2C",
-            expectedPickupDate,
-            tatDays,
-            expectedDeliveryDate,
-            rawResponse: JSON.stringify(tatResponse),
-          }).catch((err) => {
-            logger.error("Failed to save TAT query", { error: err.message });
-          });
-
-          logger.info("TAT fetched successfully", {
-            orderId: order.order_id,
-            tatDays,
-            expectedDeliveryDate,
-          });
-        }
-      })
-      .catch((err) => {
-        logger.error("Failed to fetch TAT from Delhivery", {
-          error: err.message,
-          orderId: order.order_id,
-        });
+      logger.info("TAT Response received", {
+        orderId: order.order_id,
+        response: JSON.stringify(tatResponse),
       });
+
+      // ✅ FIX: Handle Delhivery TAT response structure correctly
+      let tatDays = null;
+      
+      // Check different possible response structures
+      if (tatResponse?.data) {
+        if (Array.isArray(tatResponse.data) && tatResponse.data.length > 0) {
+          tatDays = tatResponse.data[0]?.tat;
+        } else if (tatResponse.data.tat) {
+          tatDays = tatResponse.data.tat;
+        }
+      }
+
+      if (tatDays && !isNaN(tatDays)) {
+        const expectedDeliveryDate = calculateExpectedDeliveryDate(
+          tatDays,
+          expectedPickupDate
+        );
+
+        await saveTATQuery({
+          orderId: order.order_id,
+          originPin,
+          destinationPin: shippingPincode,
+          mot: "S",
+          pdt: "B2C",
+          expectedPickupDate,
+          tatDays,
+          expectedDeliveryDate,
+          rawResponse: JSON.stringify(tatResponse),
+        });
+
+        logger.info("TAT saved successfully", {
+          orderId: order.order_id,
+          tatDays,
+          expectedDeliveryDate: expectedDeliveryDate.toISOString(),
+        });
+      } else {
+        logger.warn("TAT days not found in response", {
+          orderId: order.order_id,
+          response: tatResponse,
+        });
+        
+        // Save query even without TAT for debugging
+        await saveTATQuery({
+          orderId: order.order_id,
+          originPin,
+          destinationPin: shippingPincode,
+          mot: "S",
+          pdt: "B2C",
+          expectedPickupDate,
+          tatDays: null,
+          expectedDeliveryDate: null,
+          rawResponse: JSON.stringify(tatResponse),
+        });
+      }
+    } catch (err) {
+      logger.error("Failed to fetch/save TAT", {
+        error: err.message,
+        orderId: order.order_id,
+        stack: err.stack,
+      });
+      
+      // Save error response for debugging
+      try {
+        await saveTATQuery({
+          orderId: order.order_id,
+          originPin,
+          destinationPin: shippingPincode,
+          mot: "S",
+          pdt: "B2C",
+          expectedPickupDate,
+          tatDays: null,
+          expectedDeliveryDate: null,
+          rawResponse: JSON.stringify({ error: err.message }),
+        });
+      } catch (saveErr) {
+        logger.error("Failed to save TAT error", { error: saveErr.message });
+      }
+    }
 
     await clearCart(customerId);
 
@@ -318,7 +362,6 @@ const placeOrder = async (req, res) => {
     // Generate PDF and send emails (non-blocking)
     generateInvoicePDF(completeOrderData)
       .then(async (pdfBuffer) => {
-        // Prepare email data
         const orderDataForEmail = {
           customerName: customerName,
           orderNumber: order.order_number,
@@ -333,7 +376,6 @@ const placeOrder = async (req, res) => {
           },
         };
 
-        // Send customer email with PDF invoice
         await sendEmail({
           to: orderDataForEmail.customerEmail,
           subject: `Order Confirmation - ${orderDataForEmail.orderNumber}`,
@@ -349,7 +391,6 @@ const placeOrder = async (req, res) => {
           logger.error("Failed to send customer email", { error: err.message });
         });
 
-        // Send admin email with PDF invoice
         await sendEmail({
           to: process.env.ADMIN_EMAIL || "admin@yourstore.com",
           subject: `New Order Received - ${orderDataForEmail.orderNumber}`,
@@ -377,7 +418,6 @@ const placeOrder = async (req, res) => {
           stack: err.stack,
         });
 
-        // Fallback: Send emails without PDF
         const orderDataForEmail = {
           customerName: customerName,
           orderNumber: order.order_number,
@@ -413,9 +453,7 @@ const placeOrder = async (req, res) => {
         });
       });
 
-    // --------------------
     // WhatsApp: PAYMENT_PENDING (non-blocking)
-    // --------------------
     try {
       const whatsappPhone = normalizePhone(customerPhone);
 
@@ -566,7 +604,7 @@ const cancelOrder = async (req, res) => {
         .input(
           "response",
           mssql.NVarChar(mssql.MAX),
-          JSON.stringify(delhiveryResp)
+          JSON.stringify(delhiveryResp),
         ).query(`
           UPDATE shipments
           SET shipment_status = @status,
