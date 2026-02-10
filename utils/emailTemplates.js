@@ -1,17 +1,38 @@
 // utils/emailTemplates.js
 
 function customerTemplate(order) {
+  const subtotal = Number(order.subtotal_amount || 0);
+  const payable = Number(order.total_amount || 0);
+
+  // ratio = kitna % customer actually pay kar raha
+  const discountRatio = subtotal > 0 ? payable / subtotal : 1;
   const itemsHtml = order.items
-    ? order.items.map(item => `
+    ? order.items
+        .map(
+          (item) => `
         <tr>
-          <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.tea_name}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #eee;">
+            ${item.tea_name}
+            ${item.is_free ? '<span style="background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 6px;">FREE</span>' : ""}
+          </td>
           <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.package_name}</td>
           <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">₹${parseFloat(item.price_per_unit).toFixed(2)}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">₹${parseFloat(item.subtotal).toFixed(2)}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">
+            ${item.is_free ? "₹0.00" : `₹${parseFloat(item.price_per_unit).toFixed(2)}`}
+          </td>
+          <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">
+            ${
+              item.is_free
+                ? "₹0.00 (FREE)"
+                : `₹${(parseFloat(item.subtotal) * discountRatio).toFixed(2)}`
+            }
+          </td>
+
         </tr>
-      `).join('')
-    : '';
+      `,
+        )
+        .join("")
+    : "";
 
   return `
     <!DOCTYPE html>
@@ -40,11 +61,32 @@ function customerTemplate(order) {
           <div class="order-box">
             <h3 style="margin-top: 0; color: #667eea;">Order Information</h3>
             <p><strong>Order Number:</strong> ${order.orderNumber}</p>
-            <p><strong>Order Date:</strong> ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-            <p><strong>Total Amount:</strong> <span style="font-size: 24px; color: #667eea;">₹${order.totalAmount}</span></p>
+            <p><strong>Order Date:</strong> ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</p>
+            
+            <p><strong>Subtotal:</strong> ₹${Number(order.subtotal_amount).toFixed(2)}</p>
+
+            ${
+              order.discount_amount > 0
+                ? `
+            <p style="color: green;">
+              <strong>Discount:</strong> -₹${Number(order.discount_amount).toFixed(2)}
+            </p>`
+                : ""
+            }
+
+            <p>
+              <strong>Payable Amount:</strong>
+              <span style="font-size: 24px; color: #667eea;">
+                ₹${Number(order.total_amount).toFixed(2)}
+              </span>
+            </p>
+
+
           </div>
 
-          ${order.items ? `
+          ${
+            order.items
+              ? `
           <div class="order-box">
             <h3 style="margin-top: 0; color: #667eea;">Order Items</h3>
             <table class="table">
@@ -53,8 +95,8 @@ function customerTemplate(order) {
                   <th style="padding: 10px; text-align: left;">Product</th>
                   <th style="padding: 10px; text-align: left;">Package</th>
                   <th style="padding: 10px; text-align: center;">Qty</th>
-                  <th style="padding: 10px; text-align: right;">Price</th>
-                  <th style="padding: 10px; text-align: right;">Subtotal</th>
+                  <th style="padding: 10px; text-align: right;">Price Per Unit</th>
+                  <th style="padding: 10px; text-align: right;">Payable Amount</th>
                 </tr>
               </thead>
               <tbody>
@@ -62,25 +104,31 @@ function customerTemplate(order) {
               </tbody>
             </table>
           </div>
-          ` : ''}
+          `
+              : ""
+          }
 
-          ${order.shippingAddress ? `
+          ${
+            order.shippingAddress
+              ? `
           <div class="order-box">
             <h3 style="margin-top: 0; color: #667eea;">Shipping Address</h3>
             <p style="margin: 5px 0;">${order.shippingAddress.address}</p>
             <p style="margin: 5px 0;">${order.shippingAddress.city}, ${order.shippingAddress.state} - ${order.shippingAddress.pincode}</p>
           </div>
-          ` : ''}
+          `
+              : ""
+          }
 
           <p>We'll notify you once your order is shipped.</p>
           
           <center>
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/orders" class="button">Track Your Order</a>
+            <a href="${process.env.FRONTEND_URL || "http://localhost:3000"}/orders" class="button">Track Your Order</a>
           </center>
         </div>
         <div class="footer">
           <p>© 2024 Zenveda. All rights reserved.</p>
-          <p>Need help? Contact us at ${process.env.SUPPORT_EMAIL || 'support@zenveda.com'}</p>
+          <p>Need help? Contact us at ${process.env.SUPPORT_EMAIL || "support@zenveda.com"}</p>
         </div>
       </div>
     </body>
@@ -90,15 +138,24 @@ function customerTemplate(order) {
 
 function adminTemplate(order) {
   const itemsHtml = order.items
-    ? order.items.map(item => `
+    ? order.items
+        .map(
+          (item) => `
         <tr>
-          <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.tea_name}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #eee;">
+            ${item.tea_name}
+            ${item.is_free ? '<span style="background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 4px;">FREE</span>' : ""}
+          </td>
           <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.package_name}</td>
           <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">₹${parseFloat(item.subtotal).toFixed(2)}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">
+            ${item.is_free ? "₹0.00 (FREE)" : `₹${parseFloat(item.subtotal).toFixed(2)}`}
+          </td>
         </tr>
-      `).join('')
-    : '';
+      `,
+        )
+        .join("")
+    : "";
 
   return `
     <!DOCTYPE html>
@@ -126,10 +183,18 @@ function adminTemplate(order) {
           <h3>Order Details</h3>
           <p><strong>Order Number:</strong> ${order.orderNumber}</p>
           <p><strong>Customer:</strong> ${order.customerName}</p>
-          <p><strong>Email:</strong> ${order.customerEmail || 'N/A'}</p>
-          <p><strong>Total Amount:</strong> <span style="font-size: 20px; color: #27ae60;">₹${order.totalAmount}</span></p>
+          <p><strong>Email:</strong> ${order.customerEmail || "N/A"}</p>
+          <p><strong>Subtotal Amount:</strong> <span style="font-size: 20px; color: #27ae60;">₹${order.subtotal_amount}</span></p>
+          <p>
+            <strong>Payable Amount:</strong> 
+            <span style="font-size: 24px; color: #667eea;">
+              ₹${Number(order.total_amount).toFixed(2)}
+            </span>
+          </p>
           
-          ${order.items ? `
+          ${
+            order.items
+              ? `
           <h3>Items</h3>
           <table class="table">
             <thead>
@@ -144,18 +209,24 @@ function adminTemplate(order) {
               ${itemsHtml}
             </tbody>
           </table>
-          ` : ''}
+          `
+              : ""
+          }
 
-          ${order.shippingAddress ? `
+          ${
+            order.shippingAddress
+              ? `
           <h3>Shipping Address</h3>
           <p style="background: white; padding: 15px; border-radius: 5px; margin: 10px 0;">
             ${order.shippingAddress.address}<br>
             ${order.shippingAddress.city}, ${order.shippingAddress.state} - ${order.shippingAddress.pincode}
           </p>
-          ` : ''}
+          `
+              : ""
+          }
 
           <p style="margin-top: 20px;">
-            <a href="${process.env.ADMIN_URL || 'http://localhost:3000/admin'}/orders" 
+            <a href="${process.env.ADMIN_URL || "http://localhost:3000/admin"}/orders" 
                style="display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px;">
               View in Admin Panel
             </a>
@@ -199,10 +270,18 @@ function orderShippedTemplate(order) {
           <div class="order-box">
             <h3 style="margin-top: 0; color: #3498db;">Shipment Details</h3>
             <p><strong>Order Number:</strong> ${order.orderNumber}</p>
-            <p><strong>Total Amount:</strong> ₹${order.totalAmount}</p>
+            <p><strong>Subtotal Amount:</strong> ₹${order.subtotal_amount}</p>
+            <p>
+              <strong>Payable Amount:</strong> 
+              <span style="font-size: 24px; color: #667eea;">
+                ₹${Number(order.payable_amount ?? order.subtotal_amount).toFixed(2)}
+              </span>
+            </p>
           </div>
 
-          ${order.items ? `
+          ${
+            order.items
+              ? `
           <div class="order-box">
             <h3 style="margin-top: 0; color: #3498db;">Items in This Shipment</h3>
             <table class="table">
@@ -214,30 +293,43 @@ function orderShippedTemplate(order) {
                 </tr>
               </thead>
               <tbody>
-                ${order.items.map(item => `
+                ${order.items
+                  .map(
+                    (item) => `
                   <tr>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.tea_name}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">
+                      ${item.tea_name}
+                      ${item.is_free ? '<span style="background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 6px;">FREE</span>' : ""}
+                    </td>
                     <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.package_name}</td>
                     <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
                   </tr>
-                `).join('')}
+                `,
+                  )
+                  .join("")}
               </tbody>
             </table>
           </div>
-          ` : ''}
+          `
+              : ""
+          }
 
-          ${order.shippingAddress ? `
+          ${
+            order.shippingAddress
+              ? `
           <div class="order-box">
             <h3 style="margin-top: 0; color: #3498db;">Delivery Address</h3>
             <p style="margin: 5px 0;">${order.shippingAddress.address}</p>
             <p style="margin: 5px 0;">${order.shippingAddress.city}, ${order.shippingAddress.state} - ${order.shippingAddress.pincode}</p>
           </div>
-          ` : ''}
+          `
+              : ""
+          }
 
           <p>You'll receive another email once your order is delivered.</p>
           
           <center>
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/orders" class="button">Track Your Order</a>
+            <a href="${process.env.FRONTEND_URL || "http://localhost:3000"}/orders" class="button">Track Your Order</a>
           </center>
         </div>
       </div>
@@ -277,21 +369,36 @@ function orderDeliveredTemplate(order) {
           <div class="order-box">
             <h3 style="margin-top: 0; color: #27ae60;">Order Summary</h3>
             <p><strong>Order Number:</strong> ${order.orderNumber}</p>
-            <p><strong>Total Amount:</strong> ₹${order.totalAmount}</p>
+            <p><strong>Subtotal Amount:</strong> ₹${order.subtotal_amount}</p>
+            <p>
+              <strong>Payable Amount:</strong> 
+              <span style="font-size: 24px; color: #667eea;">
+                ₹${Number(order.payable_amount ?? order.subtotal_amount).toFixed(2)}
+              </span>
+            </p>
           </div>
 
-          ${order.items ? `
+          ${
+            order.items
+              ? `
           <div class="order-box">
             <h3 style="margin-top: 0; color: #27ae60;">Delivered Items</h3>
             <ul style="list-style: none; padding: 0;">
-              ${order.items.map(item => `
+              ${order.items
+                .map(
+                  (item) => `
                 <li style="padding: 10px; border-bottom: 1px solid #eee;">
                   <strong>${item.tea_name}</strong> - ${item.package_name} (Qty: ${item.quantity})
+                  ${item.is_free ? '<span style="background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 6px;">FREE</span>' : ""}
                 </li>
-              `).join('')}
+              `,
+                )
+                .join("")}
             </ul>
           </div>
-          ` : ''}
+          `
+              : ""
+          }
 
           <p style="text-align: center; margin: 30px 0;">
             <strong>We hope you enjoy your purchase!</strong><br>
@@ -299,8 +406,8 @@ function orderDeliveredTemplate(order) {
           </p>
           
           <center>
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/orders" class="button">View Order</a>
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/review" class="button" style="background: #f39c12;">Leave a Review</a>
+            <a href="${process.env.FRONTEND_URL || "http://localhost:3000"}/orders" class="button">View Order</a>
+            <a href="${process.env.FRONTEND_URL || "http://localhost:3000"}/review" class="button" style="background: #f39c12;">Leave a Review</a>
           </center>
 
           <p style="text-align: center; color: #666; font-size: 14px; margin-top: 30px;">
@@ -344,21 +451,36 @@ function orderCancelledTemplate(order) {
           <div class="order-box">
             <h3 style="margin-top: 0; color: #e74c3c;">Cancelled Order Details</h3>
             <p><strong>Order Number:</strong> ${order.orderNumber}</p>
-            <p><strong>Total Amount:</strong> ₹${order.totalAmount}</p>
+            <p><strong>Subtotal Amount:</strong> ₹${order.subtotal_amount}</p>
+            <p>
+              <strong>Payable Amount:</strong> 
+              <span style="font-size: 24px; color: #667eea;">
+                ₹${Number(order.payable_amount ?? order.subtotal_amount).toFixed(2)}
+              </span>
+            </p>
           </div>
 
-          ${order.items ? `
+          ${
+            order.items
+              ? `
           <div class="order-box">
             <h3 style="margin-top: 0; color: #e74c3c;">Cancelled Items</h3>
             <ul style="list-style: none; padding: 0;">
-              ${order.items.map(item => `
+              ${order.items
+                .map(
+                  (item) => `
                 <li style="padding: 10px; border-bottom: 1px solid #eee;">
                   ${item.tea_name} - ${item.package_name} (Qty: ${item.quantity})
+                  ${item.is_free ? '<span style="background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 6px;">FREE</span>' : ""}
                 </li>
-              `).join('')}
+              `,
+                )
+                .join("")}
             </ul>
           </div>
-          ` : ''}
+          `
+              : ""
+          }
 
           <p><strong>Refund Information:</strong></p>
           <p>If you've already made a payment, the refund will be processed within 5-7 business days. The amount will be credited to your original payment method.</p>
@@ -366,7 +488,7 @@ function orderCancelledTemplate(order) {
           <p>We're sorry to see this order cancelled. If you have any questions or concerns, please don't hesitate to contact our support team.</p>
           
           <center>
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/shop" class="button">Continue Shopping</a>
+            <a href="${process.env.FRONTEND_URL || "http://localhost:3000"}/shop" class="button">Continue Shopping</a>
           </center>
         </div>
       </div>
@@ -463,12 +585,11 @@ function newUserPasswordTemplate({ name, email, password, role }) {
   `;
 }
 
-
 module.exports = {
   customerTemplate,
   adminTemplate,
   orderShippedTemplate,
   orderDeliveredTemplate,
   orderCancelledTemplate,
-  newUserPasswordTemplate
+  newUserPasswordTemplate,
 };

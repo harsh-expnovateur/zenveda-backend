@@ -258,7 +258,7 @@ class DiscountController {
       res.json({
         success: true,
         message: "Discount code is valid",
-        discount: validation.discount,
+        discount: validation,
       });
     } catch (error) {
       console.error("Validate discount error:", error);

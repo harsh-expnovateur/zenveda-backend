@@ -8,11 +8,11 @@ const router = express.Router();
 router.get("/active", async (req, res) => {
   try {
     const discounts = await DiscountModel.getAll("active");
-    
+
     // Filter to only show active discounts within valid date range
     const now = new Date();
-    const validDiscounts = discounts.filter(d => 
-      new Date(d.start_date) <= now && new Date(d.end_date) >= now
+    const validDiscounts = discounts.filter(
+      (d) => new Date(d.start_date) <= now && new Date(d.end_date) >= now,
     );
 
     res.json({
@@ -43,17 +43,20 @@ router.post("/auto-apply", async (req, res) => {
     // Get all active discounts
     const allDiscounts = await DiscountModel.getAll("active");
     const now = new Date();
-    
+
     // Filter valid discounts
-    const activeDiscounts = allDiscounts.filter(d => 
-      new Date(d.start_date) <= now && new Date(d.end_date) >= now
+    const activeDiscounts = allDiscounts.filter(
+      (d) => new Date(d.start_date) <= now && new Date(d.end_date) >= now,
     );
 
     const eligibleDiscounts = [];
 
     for (const discount of activeDiscounts) {
       // Skip manual discount types (require coupon code)
-      if (discount.type === "Coupon Code" || discount.type === "Flat Price Off") {
+      if (
+        discount.type === "Coupon Code" ||
+        discount.type === "Flat Price Off"
+      ) {
         continue;
       }
 
@@ -63,8 +66,8 @@ router.post("/auto-apply", async (req, res) => {
 
       if (linkedTeas.length > 0) {
         // Discount is tea-specific
-        const linkedTeaIds = linkedTeas.map(t => t.id);
-        appliesToCart = teaIds.some(id => linkedTeaIds.includes(id));
+        const linkedTeaIds = linkedTeas.map((t) => t.id);
+        appliesToCart = teaIds.some((id) => linkedTeaIds.includes(id));
       }
 
       if (!appliesToCart) continue;
@@ -89,23 +92,33 @@ router.post("/auto-apply", async (req, res) => {
           break;
 
         case "BOGO / Quantity Offer":
-          // Check if cart has required quantity
-          const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-          if (discount.buy_quantity && totalQuantity >= discount.buy_quantity) {
-            // Give discount equal to cheapest item
-            const cheapestPrice = Math.min(...cartItems.map(i => i.price));
-            calculatedAmount = cheapestPrice * (discount.get_quantity || 1);
-            eligible = true;
-          }
-          break;
+          // 🔥 BOGO is quantity-based, NOT price-based
+          eligible = true;
+
+          eligibleDiscounts.push({
+            id: discount.id,
+            name: discount.name,
+            type: "BOGO",
+            buy_quantity: discount.buy_quantity,
+            get_quantity: discount.get_quantity,
+            tea_ids: (discount.linked_teas || []).map((t) => t.id),
+            calculatedAmount: 0, // 🔥 ALWAYS ZERO
+            description: `Buy ${discount.buy_quantity} Get ${discount.get_quantity} Free`,
+          });
+          continue;
 
         case "Free Product":
           // Apply if minimum cart value is met
           if (discount.min_cart_value && cartValue >= discount.min_cart_value) {
-            // For free product, we'll mark it as eligible
-            // The actual free product needs to be handled in cart
-            calculatedAmount = 0; // We'll handle this differently
-            eligible = true;
+            eligibleDiscounts.push({
+              id: discount.id,
+              name: discount.name,
+              type: "Free Product",
+              free_product: discount.free_product, // ✅ IMPORTANT
+              free_product_quantity: discount.free_product_quantity || 1, // ✅ IMPORTANT
+              calculatedAmount: 0,
+              description: `Free product on orders above ₹${discount.min_cart_value}`,
+            });
           }
           break;
 
@@ -113,7 +126,7 @@ router.post("/auto-apply", async (req, res) => {
           continue;
       }
 
-      if (eligible && calculatedAmount > 0) {
+      if (eligible) {
         // Ensure discount doesn't exceed cart value
         calculatedAmount = Math.min(calculatedAmount, cartValue);
 
@@ -155,5 +168,44 @@ function getDiscountDescription(discount, amount) {
       return `Save ₹${amount.toFixed(2)}`;
   }
 }
+
+// Validate coupon code (CUSTOMER)
+router.post("/validate", async (req, res) => {
+  try {
+    const { code, cartValue, teaIds } = req.body;
+
+    if (!code || !cartValue) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid request data",
+      });
+    }
+
+    const result = await DiscountModel.validateForCustomer({
+      code,
+      cartValue,
+      teaIds,
+    });
+
+    if (!result.valid) {
+      return res.json({
+        success: false,
+        message: result.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      discount: result.discount,
+    });
+  } catch (err) {
+    console.error("Customer coupon validate error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to validate coupon",
+    });
+  }
+});
+
 
 module.exports = router;

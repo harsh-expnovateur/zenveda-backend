@@ -66,6 +66,41 @@ function normalizePhone(phone) {
  */
 const placeOrder = async (req, res) => {
   try {
+    const pool = await getPool();
+
+    const getValidPackageId = async (teaId, incomingPackageId) => {
+      // 1️⃣ check: kya incoming package valid hai?
+      if (incomingPackageId) {
+        const check = await pool
+          .request()
+          .input("tea_id", mssql.Int, teaId)
+          .input("package_id", mssql.Int, incomingPackageId).query(`
+        SELECT id 
+        FROM dbo.tea_packages
+        WHERE id = @package_id AND tea_id = @tea_id
+      `);
+
+        if (check.recordset.length > 0) {
+          return incomingPackageId; // ✅ valid
+        }
+      }
+
+      // 2️⃣ fallback: cheapest active package uthao
+      const fallback = await pool.request().input("tea_id", mssql.Int, teaId)
+        .query(`
+      SELECT TOP 1 id
+      FROM dbo.tea_packages
+      WHERE tea_id = @tea_id
+      ORDER BY selling_price ASC
+    `);
+
+      if (fallback.recordset.length === 0) {
+        throw new Error(`No valid package found for tea ${teaId}`);
+      }
+
+      return fallback.recordset[0].id;
+    };
+
     const customerId = req.user.id;
     const {
       shippingAddress,
@@ -77,6 +112,7 @@ const placeOrder = async (req, res) => {
       customerEmail,
       appliedDiscountId,
       discountAmount = 0,
+      items,
     } = req.body;
 
     if (
@@ -93,7 +129,9 @@ const placeOrder = async (req, res) => {
       });
     }
 
-    const cartItems = await getCartItems(customerId);
+    const cartItems =
+      items && items.length > 0 ? items : await getCartItems(customerId);
+
     if (cartItems.length === 0) {
       return res.status(400).json({
         success: false,
@@ -102,12 +140,22 @@ const placeOrder = async (req, res) => {
     }
 
     const subtotalAmount = cartItems.reduce(
-      (sum, item) => sum + parseFloat(item.selling_price) * item.quantity,
+      (sum, item) =>
+        sum +
+        (item.is_free
+          ? 0
+          : parseFloat(item.price_per_unit || item.selling_price) *
+            item.quantity),
       0,
     );
 
     const safeDiscountAmount = Math.min(discountAmount, subtotalAmount);
-    const finalAmount = subtotalAmount - safeDiscountAmount;
+    const payableAmount =
+      safeDiscountAmount > 0
+        ? subtotalAmount - safeDiscountAmount
+        : subtotalAmount;
+
+    const finalAmount = payableAmount;
 
     const order = await createOrder({
       customerId,
@@ -122,17 +170,37 @@ const placeOrder = async (req, res) => {
       customerEmail: customerEmail || req.user.email,
       safeDiscountAmount: safeDiscountAmount,
       discountId: appliedDiscountId ?? null,
+      // payableAmount,
     });
 
-    const orderItems = cartItems.map((item) => ({
-      tea_id: item.tea_id,
-      package_id: item.package_id,
-      tea_name: item.tea_name,
-      package_name: item.package_name,
-      quantity: item.quantity,
-      price_per_unit: parseFloat(item.selling_price),
-      subtotal: parseFloat(item.selling_price) * item.quantity,
-    }));
+    const orderItems = await Promise.all(
+      cartItems.map(async (item) => {
+        const price = item.is_free
+          ? 0
+          : parseFloat(item.price_per_unit || item.selling_price || 0);
+
+        const teaId = item.tea_id ?? item.teaId;
+        const incomingPackageId =
+          item.package_id ??
+          item.packageId ??
+          item.package?.package_id ??
+          item.package?.id ??
+          null;
+
+        const packageId = await getValidPackageId(teaId, incomingPackageId);
+
+        return {
+          tea_id: teaId,
+          package_id: packageId, // ✅ NEVER NULL
+          tea_name: item.tea_name || item.name,
+          package_name: item.package_name || item.package,
+          quantity: item.quantity,
+          price_per_unit: price,
+          subtotal: price * item.quantity,
+          is_free: item.is_free === true,
+        };
+      }),
+    );
 
     await addOrderItems(order.order_id, orderItems);
 
@@ -248,7 +316,7 @@ const placeOrder = async (req, res) => {
         originPin,
         "S",
         "B2C",
-        pickupDateStr
+        pickupDateStr,
       );
 
       logger.info("TAT Response received", {
@@ -258,7 +326,7 @@ const placeOrder = async (req, res) => {
 
       // ✅ FIX: Handle Delhivery TAT response structure correctly
       let tatDays = null;
-      
+
       // Check different possible response structures
       if (tatResponse?.data) {
         if (Array.isArray(tatResponse.data) && tatResponse.data.length > 0) {
@@ -271,7 +339,7 @@ const placeOrder = async (req, res) => {
       if (tatDays && !isNaN(tatDays)) {
         const expectedDeliveryDate = calculateExpectedDeliveryDate(
           tatDays,
-          expectedPickupDate
+          expectedPickupDate,
         );
 
         await saveTATQuery({
@@ -296,7 +364,7 @@ const placeOrder = async (req, res) => {
           orderId: order.order_id,
           response: tatResponse,
         });
-        
+
         // Save query even without TAT for debugging
         await saveTATQuery({
           orderId: order.order_id,
@@ -316,7 +384,7 @@ const placeOrder = async (req, res) => {
         orderId: order.order_id,
         stack: err.stack,
       });
-      
+
       // Save error response for debugging
       try {
         await saveTATQuery({
@@ -353,6 +421,7 @@ const placeOrder = async (req, res) => {
       total_amount: finalAmount,
       subtotal_amount: subtotalAmount,
       discount_amount: safeDiscountAmount,
+      // payable_amount: payableAmount,
       shipping_charge: savedShippingCharge || 0,
       tax_amount: 0,
       payment_status: "Pending",
@@ -365,7 +434,9 @@ const placeOrder = async (req, res) => {
         const orderDataForEmail = {
           customerName: customerName,
           orderNumber: order.order_number,
-          totalAmount: finalAmount.toFixed(2),
+          subtotal_amount: completeOrderData.subtotal_amount,
+          discount_amount: completeOrderData.discount_amount,
+          total_amount: completeOrderData.total_amount,
           customerEmail: customerEmail || req.user.email,
           items: orderItems,
           shippingAddress: {

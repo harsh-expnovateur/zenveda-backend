@@ -29,6 +29,7 @@ async function createOrder({
   subtotalAmount,
   safeDiscountAmount,
   discountId,
+  payableAmount,
 }) {
   const pool = await getPool();
   const orderNumber = generateOrderNumber();
@@ -47,7 +48,9 @@ async function createOrder({
     .input("customer_email", mssql.NVarChar(150), customerEmail)
     .input("subtotal_amount", mssql.Decimal(10, 2), subtotalAmount)
     .input("discount_amount", mssql.Decimal(10, 2), safeDiscountAmount)
-    .input("discount_id", mssql.Int, discountId ?? null).query(`
+    .input("discount_id", mssql.Int, discountId ?? null)
+    // .input("payable_amount", mssql.Decimal(10, 2), payableAmount)
+    .query(`
       INSERT INTO orders (
         customer_id, order_number, total_amount,
         shipping_address, shipping_city, shipping_state, shipping_pincode,
@@ -80,14 +83,15 @@ async function addOrderItems(orderId, items) {
       .input("package_name", mssql.NVarChar(50), item.package_name)
       .input("quantity", mssql.Int, item.quantity)
       .input("price_per_unit", mssql.Decimal(10, 2), item.price_per_unit)
-      .input("subtotal", mssql.Decimal(10, 2), item.subtotal).query(`
+      .input("subtotal", mssql.Decimal(10, 2), item.subtotal)
+      .input("is_free", mssql.Bit, item.is_free ? 1 : 0).query(`
         INSERT INTO order_items (
           order_id, tea_id, package_id, tea_name, package_name,
-          quantity, price_per_unit, subtotal
+          quantity, price_per_unit, subtotal, is_free
         )
         VALUES (
           @order_id, @tea_id, @package_id, @tea_name, @package_name,
-          @quantity, @price_per_unit, @subtotal
+          @quantity, @price_per_unit, @subtotal, @is_free
         )
       `);
   }
@@ -258,7 +262,7 @@ async function saveShippingCharge({ orderId, shipmentId = null, api }) {
     .input(
       "tax_swacch_bharat",
       mssql.Decimal(10, 2),
-      num(api.tax_data?.swacch_bharat_tax)
+      num(api.tax_data?.swacch_bharat_tax),
     )
     .input("tax_IGST", mssql.Decimal(10, 2), num(api.tax_data?.IGST))
     .input("tax_SGST", mssql.Decimal(10, 2), num(api.tax_data?.SGST))
@@ -266,7 +270,7 @@ async function saveShippingCharge({ orderId, shipmentId = null, api }) {
     .input(
       "tax_krishi_kalyan",
       mssql.Decimal(10, 2),
-      num(api.tax_data?.krishi_kalyan_cess)
+      num(api.tax_data?.krishi_kalyan_cess),
     )
     .input("tax_CGST", mssql.Decimal(10, 2), num(api.tax_data?.CGST)).query(`
       INSERT INTO shipping_charges (

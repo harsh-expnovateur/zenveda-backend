@@ -17,57 +17,66 @@ class DiscountModel {
         .input(
           "discount_percentage",
           mssql.Decimal(5, 2),
-          discountData.discount_percentage || null
+          discountData.discount_percentage || null,
         )
         .input(
           "flat_discount_amount",
           mssql.Decimal(10, 2),
-          discountData.flat_discount_amount || null
+          discountData.flat_discount_amount || null,
         )
         .input("buy_quantity", mssql.Int, discountData.buy_quantity || null)
         .input("get_quantity", mssql.Int, discountData.get_quantity || null)
         .input(
           "min_cart_value",
           mssql.Decimal(10, 2),
-          discountData.min_cart_value || null
+          discountData.min_cart_value || null,
         )
         .input(
           "free_product",
           mssql.NVarChar,
-          discountData.free_product || null
+          discountData.free_product || null,
         )
+
+        .input(
+          "free_product_quantity",
+          mssql.Int,
+          discountData.free_product_quantity || null,
+        )
+
         .input(
           "banner_image",
           mssql.NVarChar,
-          discountData.banner_image || null
+          discountData.banner_image || null,
         )
         .input(
           "thumbnail_image",
           mssql.NVarChar,
-          discountData.thumbnail_image || null
+          discountData.thumbnail_image || null,
         )
         .input(
           "start_date",
           mssql.DateTime2,
-          discountData.start_date ? new Date(discountData.start_date) : null
+          discountData.start_date ? new Date(discountData.start_date) : null,
         )
         .input(
           "end_date",
           mssql.DateTime2,
-          discountData.end_date ? new Date(discountData.end_date) : null
+          discountData.end_date ? new Date(discountData.end_date) : null,
         )
         .input("status", mssql.NVarChar, discountData.status || "active")
         .query(`
           INSERT INTO discounts (
-            name, type, code, discount_percentage, flat_discount_amount,
-            buy_quantity, get_quantity, min_cart_value, free_product,
-            banner_image, thumbnail_image, start_date, end_date, status
+           name, type, code, discount_percentage, flat_discount_amount,
+  buy_quantity, get_quantity, min_cart_value, free_product,
+  free_product_quantity,
+  banner_image, thumbnail_image, start_date, end_date, status
           )
           OUTPUT INSERTED.*
           VALUES (
-            @name, @type, @code, @discount_percentage, @flat_discount_amount,
-            @buy_quantity, @get_quantity, @min_cart_value, @free_product,
-            @banner_image, @thumbnail_image, @start_date, @end_date, @status
+             @name, @type, @code, @discount_percentage, @flat_discount_amount,
+  @buy_quantity, @get_quantity, @min_cart_value, @free_product,
+  @free_product_quantity,
+  @banner_image, @thumbnail_image, @start_date, @end_date, @status
           )
         `);
 
@@ -93,8 +102,7 @@ class DiscountModel {
       await pool
         .request()
         .input("discount_id", mssql.Int, discountId)
-        .input("tea_id", mssql.Int, teaId)
-        .query(`
+        .input("tea_id", mssql.Int, teaId).query(`
           INSERT INTO discount_teas (discount_id, tea_id)
           VALUES (@discount_id, @tea_id)
         `);
@@ -106,8 +114,7 @@ class DiscountModel {
     const pool = await getPool();
     const result = await pool
       .request()
-      .input("discount_id", mssql.Int, discountId)
-      .query(`
+      .input("discount_id", mssql.Int, discountId).query(`
         SELECT t.id, t.name, t.tag, t.is_active
         FROM teas t
         INNER JOIN discount_teas dt ON t.id = dt.tea_id
@@ -168,7 +175,7 @@ class DiscountModel {
       .request()
       .input("code", mssql.NVarChar, code)
       .query(
-        "SELECT * FROM discounts WHERE code = @code AND status = 'active'"
+        "SELECT * FROM discounts WHERE code = @code AND status = 'active'",
       );
 
     return result.recordset[0];
@@ -187,36 +194,41 @@ class DiscountModel {
       .input(
         "discount_percentage",
         mssql.Decimal(5, 2),
-        discountData.discount_percentage || null
+        discountData.discount_percentage || null,
       )
       .input(
         "flat_discount_amount",
         mssql.Decimal(10, 2),
-        discountData.flat_discount_amount || null
+        discountData.flat_discount_amount || null,
       )
       .input("buy_quantity", mssql.Int, discountData.buy_quantity || null)
       .input("get_quantity", mssql.Int, discountData.get_quantity || null)
       .input(
         "min_cart_value",
         mssql.Decimal(10, 2),
-        discountData.min_cart_value || null
+        discountData.min_cart_value || null,
       )
       .input("free_product", mssql.NVarChar, discountData.free_product || null)
+      .input(
+        "free_product_quantity",
+        mssql.Int,
+        discountData.free_product_quantity || null,
+      )
       .input("banner_image", mssql.NVarChar, discountData.banner_image || null)
       .input(
         "thumbnail_image",
         mssql.NVarChar,
-        discountData.thumbnail_image || null
+        discountData.thumbnail_image || null,
       )
       .input(
         "start_date",
         mssql.DateTime2,
-        discountData.start_date ? new Date(discountData.start_date) : null
+        discountData.start_date ? new Date(discountData.start_date) : null,
       )
       .input(
         "end_date",
         mssql.DateTime2,
-        discountData.end_date ? new Date(discountData.end_date) : null
+        discountData.end_date ? new Date(discountData.end_date) : null,
       )
       .input("status", mssql.NVarChar, discountData.status).query(`
         UPDATE discounts
@@ -230,6 +242,7 @@ class DiscountModel {
           get_quantity = @get_quantity,
           min_cart_value = @min_cart_value,
           free_product = @free_product,
+          free_product_quantity = @free_product_quantity,
           banner_image = @banner_image,
           thumbnail_image = @thumbnail_image,
           start_date = @start_date,
@@ -311,9 +324,7 @@ class DiscountModel {
     const linkedTeas = await this.getLinkedTeas(discount.id);
     if (linkedTeas.length > 0 && teaIds.length > 0) {
       const linkedTeaIds = linkedTeas.map((t) => t.id);
-      const hasApplicableTea = teaIds.some((id) =>
-        linkedTeaIds.includes(id)
-      );
+      const hasApplicableTea = teaIds.some((id) => linkedTeaIds.includes(id));
 
       if (!hasApplicableTea) {
         return {
@@ -323,6 +334,19 @@ class DiscountModel {
       }
     }
 
+    // BOGO / Quantity Offer
+    if (discount.buy_quantity && discount.get_quantity) {
+      return {
+        valid: true,
+        type: "BOGO",
+        buy_quantity: discount.buy_quantity,
+        get_quantity: discount.get_quantity,
+        tea_ids: linkedTeas.map((t) => t.id),
+        discount,
+      };
+    }
+
+    // Normal discount
     return { valid: true, discount };
   }
 
@@ -339,6 +363,53 @@ class DiscountModel {
         status = 'active'
         AND end_date <= GETDATE()
     `);
+  }
+
+  // ================= CUSTOMER COUPON VALIDATION =================
+  static async validateForCustomer({ code, cartValue, teaIds }) {
+    const discounts = await this.getAll("active");
+    const now = new Date();
+
+    const discount = discounts.find(
+      (d) =>
+        d.code?.toUpperCase() === code.toUpperCase() &&
+        new Date(d.start_date) <= now &&
+        new Date(d.end_date) >= now &&
+        (d.type === "Coupon Code" || d.type === "Flat Price Off"),
+    );
+
+    if (!discount) {
+      return {
+        valid: false,
+        message: "Invalid or expired promo code",
+      };
+    }
+
+    // Minimum cart value check
+    if (discount.min_cart_value && cartValue < discount.min_cart_value) {
+      return {
+        valid: false,
+        message: `Minimum cart value ₹${discount.min_cart_value} required`,
+      };
+    }
+
+    // Tea specific coupon check
+    if (discount.linked_teas && discount.linked_teas.length > 0) {
+      const linkedTeaIds = discount.linked_teas.map((t) => t.id);
+      const applicable = teaIds.some((id) => linkedTeaIds.includes(id));
+
+      if (!applicable) {
+        return {
+          valid: false,
+          message: "Promo code not applicable to selected items",
+        };
+      }
+    }
+
+    return {
+      valid: true,
+      discount,
+    };
   }
 }
 

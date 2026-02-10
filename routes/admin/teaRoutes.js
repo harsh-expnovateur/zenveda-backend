@@ -10,7 +10,8 @@ const {
   deleteTea, 
   toggleTeaStatus,
   getGlobalIcons,
-  updateGlobalIcons
+  updateGlobalIcons,
+  getTeaPackages
 } = require("../../controllers/admin/teaController");
 const { authenticate } = require("../../middleware/authenticate");
 const checkPermission = require("../../middleware/checkPermission");
@@ -38,6 +39,14 @@ router.get("/global-icons", checkPermission("tea-management"), getGlobalIcons);
 
 // PUT update global icons (admin only)
 router.put("/global-icons", upload.fields([{ name: "icons" }]), checkPermission("tea-management"), updateGlobalIcons);
+
+// ✅ GET tea packages (for Free Product discount)
+router.get(
+  "/:teaId/packages",
+  checkPermission("tea-management"),
+  getTeaPackages
+);
+
 
 // GET all teas
 router.get("/", checkPermission("tea-management"), getAllTeas);

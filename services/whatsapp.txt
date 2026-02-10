@@ -97,3 +97,61 @@ Response:
         }
     ]
 }
+
+
+
+
+
+
+
+
+
+Please find the below curl request for your reference.
+
+Request:
+
+
+curl --location 'https://partnersv1.pinbot.ai/v3/922652130930499/messages' \
+--header 'apikey: 6bfd35b7-d02c-11f0-ae2b-02c8a5e042bd' \
+--header 'Content-Type: application/json' \
+--data '{
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": "9173855533857",
+    "type": "template",
+    "template": {
+        "name": "nudge2",
+        "language": {
+            "code": "en"
+        },
+        "components": [
+            {
+                "type": "body",
+                "parameters": [
+                    
+                    
+                    
+                    
+                ]
+            }
+        ]
+    }
+}'
+
+Response:
+
+{
+    "messaging_product": "whatsapp",
+    "contacts": [
+        {
+            "input": "9173855533857",
+            "wa_id": "9173855533857"
+        }
+    ],
+    "messages": [
+        {
+            "id": "wamid.HBgNOTE3Mzg1NTUzMzg1NxUCABEYEjc1MTk3NkQ0OTI1QTI5MkFDMQA=",
+            "message_status": "accepted"
+        }
+    ]
+}

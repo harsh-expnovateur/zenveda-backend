@@ -47,7 +47,45 @@ const addItemToCart = async (req, res) => {
 };
 
 /**
- * Get cart items
+ * Apply BOGO offer to cart items
+ */
+const applyBogoToCart = (items, bogoOffer) => {
+  if (!bogoOffer || bogoOffer.type !== "BOGO") {
+    return items;
+  }
+
+  const { buy_quantity, get_quantity, tea_ids } = bogoOffer;
+  const result = [...items];
+
+  items.forEach((item) => {
+    // Check if this item is eligible for BOGO
+    if (tea_ids && tea_ids.includes(item.teaId)) {
+      // Calculate free quantity based on purchased quantity
+      const freeQty = Math.floor(item.quantity / buy_quantity) * get_quantity;
+
+      if (freeQty > 0) {
+        // Add free item entry
+        result.push({
+          id: `free-${item.id}`,
+          teaId: item.teaId,
+          packageId: item.packageId,
+          name: item.name,
+          slug: item.slug,
+          package: item.package,
+          price: 0,
+          quantity: freeQty,
+          image: item.image,
+          is_free: true,
+        });
+      }
+    }
+  });
+
+  return result;
+};
+
+/**
+ * Get cart items with BOGO applied
  */
 const getCart = async (req, res) => {
   try {
@@ -55,7 +93,7 @@ const getCart = async (req, res) => {
     const items = await getCartItems(customerId);
 
     // Format items
-    const formattedItems = items.map((item) => ({
+    let formattedItems = items.map((item) => ({
       id: item.cart_id,
       teaId: item.tea_id,
       packageId: item.package_id,
@@ -65,8 +103,11 @@ const getCart = async (req, res) => {
       price: parseFloat(item.selling_price),
       quantity: item.quantity,
       image: item.image_url ? `http://localhost:5000/${item.image_url}` : null,
+      is_free: false,
     }));
 
+    // Check if BOGO discount is applied (from localStorage on frontend)
+    // This endpoint returns base cart - frontend will apply BOGO
     const totalAmount = formattedItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
       0

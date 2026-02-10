@@ -82,11 +82,14 @@ function invoiceHtml(order) {
               (item, i) => `
             <tr class="border-b">
               <td class="py-3">${i + 1}</td>
-              <td>${item.tea_name}</td>
+              <td>
+                ${item.tea_name}
+                ${item.is_free ? '<span class="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">FREE</span>' : ''}
+              </td>
               <td>${item.package_name}</td>
               <td>${item.quantity}</td>
-              <td>₹${item.price_per_unit.toFixed(2)}</td>
-              <td>₹${item.subtotal.toFixed(2)}</td>
+              <td>${item.is_free ? '₹0.00' : `₹${item.price_per_unit.toFixed(2)}`}</td>
+              <td>${item.is_free ? '₹0.00 (FREE)' : `₹${item.subtotal.toFixed(2)}`}</td>
             </tr>
           `
             )
