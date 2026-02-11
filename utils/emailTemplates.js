@@ -414,10 +414,10 @@ function orderDeliveredTemplate(order) {
           </p>
 
           <center>
-            <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/orders" class="button">View Order</a>
+            <a href="${process.env.FRONTEND_URL_SERVER || "http://localhost:5173"}/orders" class="button">View Order</a>
 
             <a href="${
-              process.env.FRONTEND_URL || "http://localhost:5173"
+              process.env.FRONTEND_URL_SERVER|| "http://localhost:5173"
             }/review/${order.orderNumber}" 
                class="button" 
                style="background: #f39c12;">
