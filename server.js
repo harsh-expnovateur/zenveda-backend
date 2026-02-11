@@ -20,6 +20,8 @@ const adminOrderRoutes = require("./routes/admin/orderRoutes");
 const adminCustomerRoutes = require("./routes/admin/customerRoutes");
 const adminDiscountRoutes = require("./routes/admin/discountRoutes");
 const adminUserRoutes = require("./routes/admin/userRoutes");
+const adminReviewRoutes = require("./routes/admin/reviewRoutes");
+
 
 
 // Customer routes
@@ -36,6 +38,8 @@ const customerDiscountRoutes = require("./routes/customer/discountRoutes");
 
 // Address routes
 const addressRoutes = require("./routes/customer/addressRoutes");
+const customerReviewRoutes = require("./routes/customer/reviewRoutes");
+
 
 const DiscountModel = require("./models/admin/discountModel");
 
@@ -84,6 +88,8 @@ app.use("/api/admin/orders", adminOrderRoutes);
 app.use("/api/admin/customers", adminCustomerRoutes);
 // In your main router file (e.g., server.js)
 app.use('/api/admin/discounts', adminDiscountRoutes);
+app.use("/api/admin/reviews", adminReviewRoutes);
+
 
 // Customer Routes
 app.use("/api/customer/auth", customerAuthRoutes);
@@ -99,6 +105,8 @@ app.use("/api/discounts", customerDiscountRoutes);
 
 // Address routes
 app.use("/api/customer/address", addressRoutes);
+app.use("/api/customer/reviews", customerReviewRoutes);
+
 
 app.use("/api/admin/users", adminUserRoutes);
 

@@ -270,11 +270,11 @@ function orderShippedTemplate(order) {
           <div class="order-box">
             <h3 style="margin-top: 0; color: #3498db;">Shipment Details</h3>
             <p><strong>Order Number:</strong> ${order.orderNumber}</p>
-            <p><strong>Subtotal Amount:</strong> ₹${order.subtotal_amount}</p>
+            <p><strong>Subtotal Amount:</strong> ₹${Number(order.subtotal_amount || 0).toFixed(2)}</p>
             <p>
               <strong>Payable Amount:</strong> 
               <span style="font-size: 24px; color: #667eea;">
-                ₹${Number(order.payable_amount ?? order.subtotal_amount).toFixed(2)}
+                ₹${Number(order.total_amount || order.subtotal_amount || 0).toFixed(2)}
               </span>
             </p>
           </div>
@@ -339,6 +339,10 @@ function orderShippedTemplate(order) {
 }
 
 function orderDeliveredTemplate(order) {
+  // FIX: Properly extract amounts with fallbacks
+  const subtotal = Number(order.subtotal_amount || 0);
+  const payable = Number(order.totalAmount || order.payable_amount || subtotal);
+
   return `
     <!DOCTYPE html>
     <html>
@@ -360,7 +364,7 @@ function orderDeliveredTemplate(order) {
         </div>
         <div class="content">
           <p>Dear ${order.customerName},</p>
-          
+
           <div class="success-box">
             <h2 style="margin: 0; color: #28a745;">✓ Delivered!</h2>
             <p style="font-size: 18px; margin: 10px 0;">Your order has been successfully delivered.</p>
@@ -369,11 +373,11 @@ function orderDeliveredTemplate(order) {
           <div class="order-box">
             <h3 style="margin-top: 0; color: #27ae60;">Order Summary</h3>
             <p><strong>Order Number:</strong> ${order.orderNumber}</p>
-            <p><strong>Subtotal Amount:</strong> ₹${order.subtotal_amount}</p>
+            <p><strong>Subtotal Amount:</strong> ₹${subtotal.toFixed(2)}</p>
             <p>
-              <strong>Payable Amount:</strong> 
-              <span style="font-size: 24px; color: #667eea;">
-                ₹${Number(order.payable_amount ?? order.subtotal_amount).toFixed(2)}
+              <strong>Payable Amount:</strong>
+              <span style="font-size: 24px; color: #27ae60;">
+                ₹${payable.toFixed(2)}
               </span>
             </p>
           </div>
@@ -389,9 +393,13 @@ function orderDeliveredTemplate(order) {
                   (item) => `
                 <li style="padding: 10px; border-bottom: 1px solid #eee;">
                   <strong>${item.tea_name}</strong> - ${item.package_name} (Qty: ${item.quantity})
-                  ${item.is_free ? '<span style="background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 6px;">FREE</span>' : ""}
+                  ${
+                    item.is_free
+                      ? '<span style="background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 6px;">FREE</span>'
+                      : ""
+                  }
                 </li>
-              `,
+              `
                 )
                 .join("")}
             </ul>
@@ -404,10 +412,17 @@ function orderDeliveredTemplate(order) {
             <strong>We hope you enjoy your purchase!</strong><br>
             Your feedback means a lot to us.
           </p>
-          
+
           <center>
-            <a href="${process.env.FRONTEND_URL || "http://localhost:3000"}/orders" class="button">View Order</a>
-            <a href="${process.env.FRONTEND_URL || "http://localhost:3000"}/review" class="button" style="background: #f39c12;">Leave a Review</a>
+            <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/orders" class="button">View Order</a>
+
+            <a href="${
+              process.env.FRONTEND_URL || "http://localhost:5173"
+            }/review/${order.orderNumber}" 
+               class="button" 
+               style="background: #f39c12;">
+               Leave a Review
+            </a>
           </center>
 
           <p style="text-align: center; color: #666; font-size: 14px; margin-top: 30px;">
@@ -419,6 +434,7 @@ function orderDeliveredTemplate(order) {
     </html>
   `;
 }
+
 
 function orderCancelledTemplate(order) {
   return `
@@ -451,11 +467,11 @@ function orderCancelledTemplate(order) {
           <div class="order-box">
             <h3 style="margin-top: 0; color: #e74c3c;">Cancelled Order Details</h3>
             <p><strong>Order Number:</strong> ${order.orderNumber}</p>
-            <p><strong>Subtotal Amount:</strong> ₹${order.subtotal_amount}</p>
+            <p><strong>Subtotal Amount:</strong> ₹${Number(order.subtotal_amount || 0).toFixed(2)}</p>
             <p>
               <strong>Payable Amount:</strong> 
               <span style="font-size: 24px; color: #667eea;">
-                ₹${Number(order.payable_amount ?? order.subtotal_amount).toFixed(2)}
+                ₹${Number(order.total_amount || order.subtotal_amount || 0).toFixed(2)}
               </span>
             </p>
           </div>

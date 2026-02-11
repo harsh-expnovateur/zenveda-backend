@@ -505,6 +505,7 @@ async function sendStatusEmail(orderDetails, status) {
   const emailData = {
     customerName: order.customer_name,
     orderNumber: order.order_number,
+    subtotal_amount: order.subtotal_amount,
     totalAmount: parseFloat(order.total_amount).toFixed(2),
     items: items,
     shippingAddress: {
