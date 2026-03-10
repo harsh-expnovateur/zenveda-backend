@@ -13,7 +13,7 @@ router.delete("/:id", checkPermission("reviews"), deleteReview);
 router.post(
   "/",
   checkPermission("reviews"),
-  upload.single("media"),
+  upload.array("media", 10),
   addReview
 );
 router.patch(

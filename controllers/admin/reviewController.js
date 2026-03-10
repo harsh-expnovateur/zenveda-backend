@@ -14,8 +14,12 @@ const getAllReviews = async (req, res) => {
         r.rating,
         r.review_text,
         r.is_active,
-        r.created_at
+        r.created_at,
+        m.media_type,
+        m.media_url
       FROM customer_reviews r
+      LEFT JOIN review_media m
+      ON r.review_id = m.review_id
       ORDER BY r.created_at DESC
     `);
 
@@ -31,12 +35,24 @@ const deleteReview = async (req, res) => {
     const pool = await getPool();
     const { id } = req.params;
 
-    await pool
-      .request()
+    // delete media first
+    await pool.request()
       .input("id", mssql.Int, id)
-      .query(`DELETE FROM customer_reviews WHERE review_id = @id`);
+      .query(`
+        DELETE FROM review_media
+        WHERE review_id = @id
+      `);
+
+    // delete review
+    await pool.request()
+      .input("id", mssql.Int, id)
+      .query(`
+        DELETE FROM customer_reviews
+        WHERE review_id = @id
+      `);
 
     res.json({ success: true });
+
   } catch (err) {
     console.error("Delete review error:", err);
     res.status(500).json({ error: "Server error" });
@@ -48,16 +64,13 @@ const toggleReviewStatus = async (req, res) => {
     const pool = await getPool();
     const { id } = req.params;
 
-    await pool.request()
-      .input("id", mssql.Int, id)
-      .query(`
+    await pool.request().input("id", mssql.Int, id).query(`
         UPDATE customer_reviews
         SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END
         WHERE review_id = @id
       `);
 
     res.json({ success: true });
-
   } catch (err) {
     console.error("Toggle review error:", err);
     res.status(500).json({ error: "Server error" });
@@ -97,15 +110,8 @@ const addReview = async (req, res) => {
     const { customer_name, tea_name, package_name, rating, review_text } =
       req.body;
 
-    let mediaType = null;
-    let mediaUrl = null;
-
-    if (req.file) {
-      mediaUrl = `/uploads/reviews/${req.file.filename}`;
-      mediaType = req.file.mimetype.startsWith("video") ? "video" : "image";
-    }
-
-    await pool
+    // Insert review first
+    const reviewInsert = await pool
       .request()
       .input("order_id", mssql.Int, null)
       .input("order_item_id", mssql.Int, null)
@@ -119,9 +125,7 @@ const addReview = async (req, res) => {
       .input("quantity", mssql.Int, null)
       .input("price_per_unit", mssql.Decimal(10, 2), null)
       .input("rating", mssql.Int, rating)
-      .input("review_text", mssql.NVarChar, review_text)
-      .input("media_type", mssql.NVarChar, mediaType)
-      .input("media_url", mssql.NVarChar, mediaUrl).query(`
+      .input("review_text", mssql.NVarChar, review_text).query(`
         INSERT INTO customer_reviews (
           order_id,
           order_item_id,
@@ -135,10 +139,9 @@ const addReview = async (req, res) => {
           quantity,
           price_per_unit,
           rating,
-          review_text,
-          media_type,
-          media_url
+          review_text
         )
+        OUTPUT INSERTED.review_id
         VALUES (
           @order_id,
           @order_item_id,
@@ -152,11 +155,33 @@ const addReview = async (req, res) => {
           @quantity,
           @price_per_unit,
           @rating,
-          @review_text,
-          @media_type,
-          @media_url
+          @review_text
         )
       `);
+
+    const reviewId = reviewInsert.recordset[0].review_id;
+
+    // Insert media files
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        await pool
+          .request()
+          .input("review_id", mssql.Int, reviewId)
+          .input(
+            "media_type",
+            mssql.NVarChar,
+            file.mimetype.startsWith("video") ? "video" : "image",
+          )
+          .input(
+            "media_url",
+            mssql.NVarChar,
+            `/uploads/reviews/${file.filename}`,
+          ).query(`
+            INSERT INTO review_media (review_id, media_type, media_url)
+            VALUES (@review_id, @media_type, @media_url)
+          `);
+      }
+    }
 
     res.json({ success: true });
   } catch (err) {
